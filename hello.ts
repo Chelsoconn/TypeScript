@@ -1,7 +1,14 @@
-type Shape = { color: string; sides: number };
-type Square = { color: string; sides: number; sideLength: number };
+class Animal {
+  #species = "I am private";
 
-const redSquare: Square = { color: "red", sides: 4, sideLength: 5 };
-const shape: Shape = redSquare;
+  constructor(species: string) {
+    this.#species = species;
+  }
+  printPrivateProperty() {
+    console.log(`I am a private ${this.#species}`);
+  }
+}
 
-console.log(shape.sideLength);
+const myCat = new Animal("Cat");
+myCat.printPrivateProperty(); // 'I am a private Cat'
+//console.log(myCat.#species); // SyntaxError: Private field '#species' must be declared in an enclosing class

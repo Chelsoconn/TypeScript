@@ -1,15 +1,26 @@
-//variables assigned to an object with more properties can be assigned to 
-//Fruit but these are no longer accessible, but not vise versa
-//also object literals with less properties than the superset cannot be assigned to the 
-//superset type 
-function describeFruit(fruit) {
-    return "".concat(fruit.name, " is a ").concat(fruit.color, " fruit.");
-}
-var goldenDelicious = {
-    name: "Golden Delicious",
-    color: "yellow",
-    variety: "apple",
+var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
 };
-console.log(describeFruit(goldenDelicious)); //we are passing in an argumment with 
-//more properties than the allowed type. This is ok bc we are 
-//assigning the argument to the parameter variable 
+var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};
+var _Animal_species;
+var Animal = /** @class */ (function () {
+    function Animal(species) {
+        _Animal_species.set(this, "I am private");
+        __classPrivateFieldSet(this, _Animal_species, species, "f");
+    }
+    Animal.prototype.printPrivateProperty = function () {
+        console.log("I am a private ".concat(__classPrivateFieldGet(this, _Animal_species, "f")));
+    };
+    return Animal;
+}());
+_Animal_species = new WeakMap();
+var myCat = new Animal("Cat");
+myCat.printPrivateProperty(); // 'I am a private Cat'
+//console.log(myCat.#species); // SyntaxError: Private field '#species' must be declared in an enclosing class
