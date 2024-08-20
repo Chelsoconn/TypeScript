@@ -1,14 +1,14 @@
-class Animal {
-  #species = "I am private";
+type Pair<T, U> = {
+  first: T;
+  second: U;
+};
 
-  constructor(species: string) {
-    this.#species = species;
-  }
-  printPrivateProperty() {
-    console.log(`I am a private ${this.#species}`);
-  }
-}
+const myPair: Pair<number, string> = {
+  first: 42,
+  second: "Answer",
+};
 
-const myCat = new Animal("Cat");
-myCat.printPrivateProperty(); // 'I am a private Cat'
-//console.log(myCat.#species); // SyntaxError: Private field '#species' must be declared in an enclosing class
+// const yourPair: Pair<number, string> = {
+//   first: "Another answer",
+//   second: 42,
+// };
