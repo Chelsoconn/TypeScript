@@ -3709,11 +3709,454 @@ JavaScript’s looser equality checks with `==` and `!=` also get narrowed corre
 
 5. *instanceof* narrowing 
 
+   ```ts
+   function logValue(x: Date | string) {
+     if (x instanceof Date) {
+       console.log(x.toUTCString());
+                  
+   (parameter) x: Date
+     } else {
+       console.log(x.toUpperCase());
+                  
+   (parameter) x: string
+     }
+   }
+   ```
+
    
 
+6. *Assignments*
+
+   As we mentioned earlier, when we assign to any variable, TypeScript looks at the right side of the assignment and narrows the left side appropriately.
+
+```ts
+let x = Math.random() < 0.5 ? 10 : "hello world!";
+   
+let x: string | number
+x = 1;
+ 
+console.log(x);
+           
+let x: number
+x = "goodbye!";
+ 
+console.log(x);
+           
+let x: string
+```
+
+Notice that each of these assignments is valid. Even though the observed type of `x` changed to `number` after our first assignment, we were still able to assign a `string` to `x`. This is because the *declared type* of `x` - the type that `x` started with - is `string | number`, and assignability is always checked against the declared type.
+
+If we’d assigned a `boolean` to `x`, we’d have seen an error since that wasn’t part of the declared type.
 
 
 
+*Control Flow Analysis*
+
+Up until this point, we’ve gone through some basic examples of how TypeScript narrows within specific branches. But there’s a bit more going on than just walking up from every variable and looking for type guards in `if`s, `while`s, conditionals, etc. 
+
+This analysis of code based on reachability is called *control flow analysis*, and TypeScript uses this flow analysis to narrow types as it encounters type guards and assignments.
+
+When a variable is analyzed, control flow can split off and re-merge over and over again, and that variable can be observed to have a different type at each point.
+
+```ts
+function example() {
+  let x: string | number | boolean;
+ 
+  x = Math.random() < 0.5;
+ 
+  console.log(x);
+             
+let x: boolean
+ 
+  if (Math.random() < 0.5) {
+    x = "hello";
+    console.log(x);
+               
+let x: string
+  } else {
+    x = 100;
+    console.log(x);
+               
+let x: number
+  }
+ 
+  return x;
+        
+let x: string | number
+}
+```
+
+**Using Type Predicates**
+
+We’ve worked with existing JavaScript constructs to handle narrowing so far, however sometimes you want more direct control over how types change throughout your code.
+
+To define a user-defined type guard, we simply need to define a function whose return type is a *type predicate*:
+
+```ts
+function isFish(pet: Fish | Bird): pet is Fish {
+  return (pet as Fish).swim !== undefined;
+}
+```
+
+`pet is Fish` is our type predicate in this example. A predicate takes the form `parameterName is Type`, where `parameterName` must be the name of a parameter from the current function signature.
+
+Any time `isFish` is called with some variable, TypeScript will *narrow* that variable to that specific type if the original type is compatible.
+
+- **Function Definition**: `isFish(pet: Pet): pet is Fish`
+  - `isFish` is a type predicate function.
+  - `pet is Fish` is the type predicate. It means that if `isFish(pet)` returns `true`, then `pet` should be treated as a `Fish`.
+- **Type Narrowing**:
+  - Inside the `if` statement where `isFish(pet)` is used, TypeScript narrows the type of `pet` to `Fish`. This allows you to safely access properties and methods specific to `Fish`.
+
+```ts
+// Both calls to 'swim' and 'fly' are now okay.
+let pet = getSmallPet();
+ 
+if (isFish(pet)) {
+  pet.swim();
+} else {
+  pet.fly();
+}
+```
+
+```ts
+//without Type Predicates
+interface Fish {
+  swim: () => void;
+}
+
+interface Bird {
+  fly: () => void;
+}
+
+type Pet = Fish | Bird;
+
+function handlePet(pet: Pet) {
+  if ('swim' in pet) {
+    (pet as Fish).swim(); // TypeScript knows `pet` is `Fish` here
+  } else if ('fly' in pet) {
+    (pet as Bird).fly(); // TypeScript knows `pet` is `Bird` here
+  } else {
+    console.log('Unknown pet type');
+  }
+}
+
+//here we need to tell ts that if it has this function then it actually is an instance of the Fish class using `as`
+
+//OR 
+class Fish {
+  swim() {
+    console.log("Swimming");
+  }
+}
+
+class Bird {
+  fly() {
+    console.log("Flying");
+  }
+}
+
+type Pet = Fish | Bird;
+
+function handlePet(pet: Pet) {
+  if (pet instanceof Fish) {
+    pet.swim(); // TypeScript knows `pet` is `Fish` here
+  } else if (pet instanceof Bird) {
+    pet.fly(); // TypeScript knows `pet` is `Bird` here
+  } else {
+    console.log('Unknown pet type');
+  }
+}
+
+//OR 
+interface Fish {
+  kind: 'fish';
+  swim: () => void;
+}
+
+interface Bird {
+  kind: 'bird';
+  fly: () => void;
+}
+
+type Pet = Fish | Bird;
+
+function handlePet(pet: Pet) {
+  if (pet.kind === 'fish') {
+    pet.swim(); // TypeScript knows `pet` is `Fish` here
+  } else if (pet.kind === 'bird') {
+    pet.fly(); // TypeScript knows `pet` is `Bird` here
+  } else {
+    console.log('Unknown pet type');
+  }
+}
+
+
+```
+
+```ts
+const zoo: (Fish | Bird)[] = [getSmallPet(), getSmallPet(), getSmallPet()];
+const underWater1: Fish[] = zoo.filter(isFish);
+// or, equivalently
+const underWater2: Fish[] = zoo.filter(isFish) as Fish[];
+ 
+// The predicate may need repeating for more complex examples
+const underWater3: Fish[] = zoo.filter((pet): pet is Fish => {
+  if (pet.name === "sharkey") return false;
+  return isFish(pet);
+});
+Try
+
+```
+
+using `this is` 
+
+```ts
+isFish(): this is { pet: Fish } {
+    return 'swim' in this.pet;
+  }
+```
+
+*Narrowing by Assertion Functions*
+
+There’s a specific set of functions that `throw` an error if something unexpected happened. They’re called “assertion” functions. As an example, Node.js has a dedicated function for this called `assert`.
+
+```js
+assert(someValue === 42);
+```
+
+```ts
+function multiply(x, y) {
+  assert(typeof x === "number");
+  assert(typeof y === "number");
+  return x * y;
+}
+```
+
+```ts
+function assert(condition: any, msg?: string): asserts condition {
+  if (!condition) {
+    throw new AssertionError(msg);
+  }
+}
+```
+
+`asserts condition` says that whatever gets passed into the `condition` parameter must be true if the `assert` returns (because otherwise it would throw an error). That means that for the rest of the scope, that condition must be truthy. As an example, using this assertion function means we *do* catch our original `yell` example.
+
+```ts
+function assertIsString(val: any): asserts val is string {
+  if (typeof val !== "string") {
+    throw new AssertionError("Not a string!");
+  }
+}
+```
+
+**Discrimated Unions**
+
+Most of the examples we’ve looked at so far have focused around narrowing single variables with simple types like `string`, `boolean`, and `number`. While this is common, most of the time in JavaScript we’ll be dealing with slightly more complex structures.
+
+```ts
+interface Shape {
+  kind: "circle" | "square";
+  radius?: number;
+  sideLength?: number;
+}
+```
+
+Notice we’re using a union of string literal types: `"circle"` and `"square"` to tell us whether we should treat the shape as a circle or square respectively. By using `"circle" | "square"` instead of `string`, we can avoid misspelling issues.
+
+```ts
+function handleShape(shape: Shape) {
+  // oops!
+  if (shape.kind === "rect") {
+This comparison appears to be unintentional because the types '"circle" | "square"' and '"rect"' have no overlap.
+    // ...
+  }
+}
+
+//also
+
+function getArea(shape: Shape) {
+  if (shape.kind === "circle") {
+    return Math.PI * shape.radius ** 2;
+'shape.radius' is possibly 'undefined'.
+  }
+}
+```
+
+Hmm, TypeScript still doesn’t know what to do here. We’ve hit a point where we know more about our values than the type checker does. We could try to use a non-null assertion (a `!` after `shape.radius`) to say that `radius` is definitely present.
+
+```js
+function getArea(shape: Shape) {
+  if (shape.kind === "circle") {
+    return Math.PI * shape.radius! ** 2;
+  }
+}
+```
+
+But this doesn’t feel ideal. We had to shout a bit at the type-checker with those non-null assertions (`!`) to convince it that `shape.radius` was defined, but those assertions are error-prone if we start to move code around. Additionally, outside of [`strictNullChecks`](https://www.typescriptlang.org/tsconfig#strictNullChecks) we’re able to accidentally access any of those fields anyway (since optional properties are just assumed to always be present when reading them). We can definitely do better.
+
+The problem with this encoding of `Shape` is that the type-checker doesn’t have any way to know whether or not `radius` or `sideLength` are present based on the `kind` property. We need to communicate what *we* know to the type checker. With that in mind, let’s take another swing at defining `Shape`.
+
+```ts
+ interface Circle {
+  kind: "circle";
+  radius: number;
+}
+ 
+interface Square {
+  kind: "square";
+  sideLength: number;
+}
+ 
+type Shape = Circle | Square;
+
+function getArea(shape: Shape) {
+  return Math.PI * shape.radius ** 2;
+  Property 'radius' does not exist on type 'Shape'.
+  Property 'radius' does not exist on type 'Square'.
+}
+
+//narrow
+function getArea(shape: Shape) {
+  if (shape.kind === "circle") {
+    return Math.PI * shape.radius ** 2;
+                      
+(parameter) shape: Circle
+  }
+}
+```
+
+In this case, `kind` was that common property (which is what’s considered a *discriminant* property of `Shape`). Checking whether the `kind` property was `"circle"` got rid of every type in `Shape` that didn’t have a `kind` property with the type `"circle"`. That narrowed `shape` down to the type `Circle`.
+
+
+
+**Exhastiveness checking**
+
+*Never*
+
+The `never` type in TypeScript represents a value that never occurs. This can be due to a function that never returns, or a situation that is logically impossible. It's used in exhaustive checks to signify that all possible cases have been handled, and no other cases should be possible. So say we say the arg is a pet, and then we narrow and we should never get to the bottom but we do.. if we use `never` than itll make an error 
+
+The `never` type is assignable to every type; however, no type is assignable to `never` (except `never` itself). This means you can use narrowing and rely on `never` turning up to do exhaustive checking in a `switch` statement.
+
+For example, adding a `default` to our `getArea` function which tries to assign the shape to `never` will not raise an error when every possible case has been handled.
+
+```ts
+type Shape = Circle | Square;
+ 
+function getArea(shape: Shape) {
+  switch (shape.kind) {
+    case "circle":
+      return Math.PI * shape.radius ** 2;
+    case "square":
+      return shape.sideLength ** 2;
+    default:
+      const _exhaustiveCheck: never = shape;
+      return _exhaustiveCheck;
+  }
+}
+
+interface Triangle {
+  kind: "triangle";
+  sideLength: number;
+}
+ 
+type Shape = Circle | Square | Triangle;
+ 
+function getArea(shape: Shape) {
+  switch (shape.kind) {
+    case "circle":
+      return Math.PI * shape.radius ** 2;
+    case "square":
+      return shape.sideLength ** 2;
+    default:
+      const _exhaustiveCheck: never = shape;
+Type 'Triangle' is not assignable to type 'never'.
+      return _exhaustiveCheck;
+  }
+}
+```
+
+
+
+**Practice Problems: Narrowing with Type Guards**
+
+1) ```ts
+   type Video = {
+     title: string;
+     creator: string;
+   };
+   
+   function printVideoInfo(videoOrVideos: Video | Video[]) {
+     if ("length" in videoOrVideos) {
+       videoOrVideos.forEach((v) =>
+         console.log(`"${v.title}" by ${v.creator}`)
+       );
+     } else {
+       console.log(`"${videoOrVideos.title}" by ${videoOrVideos.creator}`);
+     }
+   }
+   
+   printVideoInfo({
+     title: "Introduction to TypeScript",
+     creator: "John Doe",
+   });
+   ```
+
+   Will the following code result in a type error or execute without any issues?
+
+All good! 
+
+2. ```ts
+   type Video = {
+     title: string;
+     creator: string;
+     length: number;
+   };
+   
+   function printVideoInfo(videoOrVideos: Video | Video[]) {
+     if ("length" in videoOrVideos) {
+       videoOrVideos.forEach((v) =>
+         console.log(`"${v.title}" by ${v.creator}`)
+       );
+     } else {
+       console.log(`"${videoOrVideos.title}" by ${videoOrVideos.creator}`);
+     }
+   }
+   
+   printVideoInfo({
+     title: "Introduction to TypeScript",
+     creator: "John Doe",
+     length: 100,
+   });
+   ```
+
+So in this one we include a length property in our object.. because of this we are within the `if` conditional even if we have an object.
+
+
+
+This time around, our code will result in a type error.
+
+```plaintext
+Property 'forEach' does not exist on type 'Video | Video[]'.
+```
+
+TypeScript becomes confused because it cannot determine whether `videoOrVideos` is a single `Video` object or an array of `Video` objects when checking for the `length` property. This is because the `Video` type also has a `length` property, which makes the type guard check with `length` ambiguous.
+
+To resolve this issue, we can use the `isArray` method on the `Array` object. This will enable us to correctly determine whether `videoOrVideos` is an array or not.
+
+```ts
+function printVideoInfo(videoOrVideos: Video | Video[]) {
+  if (Array.isArray(videoOrVideos)) {
+    videoOrVideos.forEach((v) =>
+      console.log(`"${v.title}" by ${v.creator}`)
+    );
+  } else {
+    console.log(`"${videoOrVideos.title}" by ${videoOrVideos.creator}`);
+  }
+}
+```
 
 
 
