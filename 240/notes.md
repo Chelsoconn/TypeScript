@@ -4877,6 +4877,413 @@ And as you may have noticed, because of this, we don't even need to declare the 
    }
    ```
 
+ [Index Signatures](https://www.typescriptlang.org/docs/handbook/2/objects.html#index-signatures) through [Interfaces vs Intersections](https://www.typescriptlang.org/docs/handbook/2/objects.html#interfaces-vs-intersections). 
+
+
+
+**Index Signature**
+
+Sometimes you don’t know all the names of a type’s properties ahead of time, but you do know the shape of the values.
+
+In those cases you can use an index signature to describe the types of possible values, for example:
+
+```ts
+interface StringArray {
+  [index: number]: string; //obj keys get converted to strings so you could also put [index: string] even if the key is a number 
+}
+
+const myArray: StringArray = getStringArray();
+const secondItem = myArray[1];
+```
+
+Above, we have a `StringArray` interface which has an index signature. This index signature states that when a `StringArray` is indexed with a `number`, it will return a `string`.
+
+Only some types are allowed for index signature properties: `string`, `number`, `symbol`, template string patterns, and union types consisting only of these.
+
+Yes, with an index signature like the one in the `StringArray` example, if you try to access a property that doesn't exist, TypeScript will infer that the result is of the specified value type, which in this case is `string`.
+
+*My explanation*
+
+```ts
+interface Animal {
+  name: string;
+}
+
+interface Dog extends Animal {
+  breed: string;
+}
+
+interface Okay {
+  [x: number]: Animal;
+  [x: string]: Dog;
+}
+
+```
+
+so this is saying that the number is essentially a string.. so a string has to return a dog so you can reverse it and say that  [x: string]: Animal;  [x: number]: Dog; bc this would mean that all things would return a dog and dogs are all animals so it doesnt contradict itself? BUT
+
+```ts
+interface Animal {
+  name: string;
+}
+ 
+interface Dog extends Animal {
+  breed: string;
+}
+ 
+// Error: indexing with a numeric string might get you a completely separate type of Animal!
+interface NotOkay {
+  [x: number]: Animal;
+'number' index type 'Animal' is not assignable to 'string' index type 'Dog'.
+
+```
+
+bc not all animals are dogs 
+
+
+
+and also 
+
+```ts
+interface NumberDictionary {
+  [index: string]: number;
+ 
+  length: number; // ok
+  name: string;
+Property 'name' of type 'string' is not assignable to 'string' index type 'number'.
+}
+//fix it 
+interface NumberOrStringDictionary {
+  [index: string]: number | string;
+  length: number; // ok, length is a number
+  name: string; // ok, name is a string
+}
+```
+
+*readonly*
+
+```ts
+interface ReadonlyStringArray {
+  readonly [index: number]: string;
+}
+ 
+let myArray: ReadonlyStringArray = getReadOnlyStringArray();
+myArray[2] = "Mallory";
+Index signature in type 'ReadonlyStringArray' only permits reading.
+```
+
+Where and how an object is assigned a type can make a difference in the type system. One of the key examples of this is in excess property checking, which validates the object more thoroughly when it is created and assigned to an object type during creation.
+
+```ts
+interface SquareConfig {
+  color?: string;
+  width?: number;
+}
+ 
+function createSquare(config: SquareConfig): { color: string; area: number } {
+  return {
+    color: config.color || "red",
+    area: config.width ? config.width * config.width : 20,
+  };
+}
+ 
+let mySquare = createSquare({ colour: "red", width: 100 });
+Object literal may only specify known properties, but 'colour' does not exist in type 'SquareConfig'. Did you mean to write 'color'?
+```
+
+However, TypeScript takes the stance that there’s probably a bug in this code. Object literals get special treatment and undergo *excess property checking* when assigning them to other variables, or passing them as arguments. If an object literal has any properties that the “target type” doesn’t have, you’ll get an error:
+
+**SO OBJECT LITERALS ARE TREATED DIFFERENT THAN VARIABLE ASSIGNEMENT**
+
+so this is ok... BUT not if it has NO common properties... The above workaround will work as long as you have a common property between `squareOptions` and `SquareConfig`. In this example, it was the property `width`. It will however, fail if the variable does not have any common object property. For example:
+
+```ts
+interface SquareConfig {
+  color?: string;
+  width?: number;
+}
+ 
+function createSquare(config: SquareConfig): { color: string; area: number } {
+  return {
+    color: config.color || "red",
+    area: config.width ? config.width * config.width : 20,
+  };
+}
+ 
+
+let x = { colour: "red", width: 100 }
+let mySquare = createSquare(x);
+
+```
+
+Getting around these checks is actually really simple. The easiest method is to just use a type assertion:
+
+```ts
+let mySquare = createSquare({ width: 100, opacity: 0.5 } as SquareConfig);Try
+```
+
+However, a better approach might be to add a string index signature if you’re sure that the object can have some extra properties that are used in some special way. If `SquareConfig` can have `color` and `width` properties with the above types, but could *also* have any number of other properties, then we could define it like so:
+
+```ts
+interface SquareConfig {
+  color?: string;
+  width?: number;
+  [propName: string]: any;
+}
+```
+
+**Adding properties to an interface using *extends* **
+
+```ts
+interface BasicAddress {
+  name?: string;
+  street: string;
+  city: string;
+  country: string;
+  postalCode: string;
+}
+ 
+interface AddressWithUnit extends BasicAddress {
+  unit: string;
+}
+```
+
+The `extends` keyword on an `interface` allows us to effectively copy members from other named types, and add whatever new members we want. This can be useful for cutting down the amount of type declaration boilerplate we have to write, and for signaling intent that several different declarations of the same property might be related. For example, `AddressWithUnit` didn’t need to repeat the `street` property, and because `street` originates from `BasicAddress`, a reader will know that those two types are related in some way.
+
+also..
+
+```ts
+interface Colorful {
+  color: string;
+}
+ 
+interface Circle {
+  radius: number;
+}
+ 
+interface ColorfulCircle extends Colorful, Circle {}
+ 
+const cc: ColorfulCircle = {
+  color: "red",
+  radius: 42,
+};
+```
+
+**Intersection Types**
+
+`interface`s allowed us to build up new types from other types by extending them. TypeScript provides another construct called *intersection types* that is mainly used to combine existing object types.
+
+An intersection type is defined using the `&` operator.
+
+```ts
+interface Colorful {
+  color: string;
+}
+
+interface Circle {
+  radius: number;
+}
+
+type ColorfulCircle = Colorful & Circle //note the use of "type" instead of interface
+```
+
+Here, we’ve intersected `Colorful` and `Circle` to produce a new type that has all the members of `Colorful` *and* `Circle`.
+
+**Interfaces vs. Intersections**
+
+We just looked at two ways to combine types which are similar, but are actually subtly different. With interfaces, we could use an `extends` clause to extend from other types, and we were able to do something similar with intersections and name the result with a type alias. The principal difference between the two is how conflicts are handled, and that difference is typically one of the main reasons why you’d pick one over the other between an interface and a type alias of an intersection type.
+
+If interfaces are defined with the same name, TypeScript will attempt to merge them if the properties are compatible. If the properties are not compatible (i.e., they have the same property name but different types), TypeScript will raise an error.
+
+In the case of intersection types, properties with different types will be merged automatically. When the type is used later, TypeScript will expect the property to satisfy both types simultaneously, which may produce unexpected results.
+
+For example, the following code will throw an error because the properties are incompatible:
+
+```ts
+interface Person {
+  name: string;
+}
+
+interface Person {
+  name: number;
+}
+```
+
+In contrast, the following code will compile, but it results in a `never` type:
+
+```ts
+interface Person1 {
+  name: string;
+}
+ 
+interface Person2 {
+  name: number;
+}
+ 
+type Staff = Person1 & Person2 //you can combine two types or two interfaces but the combined one is always a type 
+ 
+declare const staffer: Staff;
+staffer.name;
+```
+
+What's happening is that the compiler determines that the `id` property on `Student & User` should be the intersection of `string & number`. In pseudocode:
+
+```ts
+{id: string} & {id: number} == {id: string & number}
+```
+
+Of course, `string` and `number` don't have any intersecting values, so `id` must be of type `never`.
+
+
+
+
+
+See here that type makes it easier to have additional properties in your type object....
+
+you can just have it and if you call it it will be undefined... BUT if you do interface then you have to add it to the interface via extends or intersections
+
+
+
+**Declaration Merging**
+
+So if you don't want to rename the interface and you want to add another property then you can just say interface sameName = {new prop}
+
+but if you add the props after you initialize an object to that type then the first one is still valid and you cant access that prop on it 
+
+
+
+You can't extend a `type` 
+
+
+
+**Practice Problems Extending Interfaces**
+
+Please convert this code to TypeScript using interfaces and interface extension. Assume all animals have a `name` and can `makeSound`, and dogs in addition can `fetch`.
+
+```ts
+class Animal {
+  constructor(name) {
+    this.name = name;
+  }
+
+  makeSound() {
+    return "Generic animal sound";
+  }
+}
+
+class Dog extends Animal {
+  constructor(name) {
+    super(name);
+  }
+
+  fetch() {
+    return `${this.name} fetches a stick.`;
+  }
+}
+
+const myDog = new Dog("Rex");
+console.log(myDog.fetch());
+```
+
+so we can keep it as a class: 
+
+```ts
+interface Animal {
+  name: string;
+  makeSound(): string;
+}
+
+interface Dog extends Animal{
+  fetch(): string;
+}
+
+class Animal {
+  constructor(name) {
+    this.name = name;
+  }
+
+  makeSound() {
+    return "Generic animal sound";
+  }
+}
+
+class Dog extends Animal {
+  constructor(name) {
+    super(name);
+  }
+
+  fetch() {
+    return `${this.name} fetches a stick.`;
+  }
+}
+
+const myDog = new Dog("Rex");
+console.log(myDog.fetch());
+```
+
+or switch it over to an object
+
+```ts
+interface Animal {
+  name: string;
+  makeSound(): string;
+}
+
+interface Dog extends Animal {
+  fetch(): string;
+}
+
+const myDog: Dog = {
+  name: "Rex",
+  makeSound: () => "Generic animal sound",
+  fetch: () => "Rex fetches a stick.",
+};
+
+console.log(myDog.fetch());
+```
+
+If we want to use types and intersections then we cant use extends we have to use & 
+
+```ts
+type Product = {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+};
+
+type Review = {
+  id: string;
+  productId: string;
+  rating: number;
+  comment: string;
+};
+
+type ProductWithReviews = Product & {
+  reviews: Review[];
+};
+```
+
+
+
+**Practice Problems: Type Intersections**
+
+1) Consider the following two types 
+
+   ```ts
+   type Product = {
+     name: string;
+     price: number;
+   };
+   
+   type Shipping = {
+     weight: number;
+     shippingCost: number;
+   };
+   ```
+
+   Now, imagine there's a new product type called `ShippableProduct`, that combines the properties of both `Product` and `Shipping`. Try to create this new type using the knowledge you just learned.
+
 
 
 
