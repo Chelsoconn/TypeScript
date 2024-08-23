@@ -346,9 +346,25 @@ https://www.typescriptlang.org/docs/handbook/2/everyday-types.html
 
 - any
 
-  - TypeScript also has a special type, `any`, that you can use whenever you don’t want a particular value to cause typechecking errors.
+  - TypeScript also has a special type, `any`, that you can use whenever you don’t want a particular value to cause typechecking errors. You can assign all types to a variable of `any` type, and a value with type `any` can be assigned to every other type (except `never`): Using `any` essentially turns off type checking for a given value or assignment. This can be a useful tool in some specific scenarios, but is more often a source of potential problems.
 
   - The `any` type is a type that disables TypeScript's type checking, effectively allowing `obj` to hold any value or structure.
+
+  - ```ts
+    // Accessing a method that doesn't exist
+    let isStudent: any = true;
+    let school: string = isStudent;
+    console.log(school.toLowerCase()); // No compile-time error, but runtime error
+    
+    //When you declare isStudent as any, TypeScript will not perform any type checking on isStudent. This means you can assign any value to isStudent without TypeScript complaining. Here, isStudent is assigned a boolean (true).
+    Assignment to school:
+    
+    You then assign isStudent to school, which is typed as string. Since isStudent is of type any, TypeScript allows this assignment because it doesn't enforce type constraints. Essentially, any overrides type safety.
+    ```
+  
+  - The above code snippets are examples of type unsoundness, where TypeScript's type system fails to catch a type error. This type unsoundness can subtly spread throughout an application. Since `any` types can be so flexibly reassigned, they make it easy for an incorrect type to be introduced in one part of an application, get passed through many functions, and cause an error in a completely different function or file. For this reason, it's important to use `any` sparingly and only when necessary.
+  
+  - While `any` makes your code more flexible, it also prevents the type system from ensuring that variables have the types that we think they have. This can make it easy to assign the incorrect value to a variable or access a property or method that doesn't exist -- in all cases leading to the sort of runtime errors TypeScript is designed to catch:
 
   - ```js
     let obj: any = { x: 0 };
@@ -365,8 +381,98 @@ https://www.typescriptlang.org/docs/handbook/2/everyday-types.html
     console.log(obj.y); // Output: hello
     
     ```
+  
+- **When to use `any`**
 
-    
+  - **Gradual migration from JavaScript to TypeScript:** When transitioning an existing JavaScript codebase to TypeScript, employing the `any` type can serve as a practical initial step. This approach enables you to progressively introduce type annotations and enhance type safety while maintaining the functionality of the code throughout the migration process.
+
+  - **Working with third-party libraries:** You may be working with a library that lacks TypeScript type definitions or has incorrect or incomplete type definitions. In this case, `any` can be a temporary solution until the proper types are available, either by adding them yourself, using community-provided type definitions, or waiting for the library maintainers to add them.
+
+  If you decide to use `any` in this scenario, you should use **type guards** to narrow the `any` type back to the type it should have.
+  
+  Here's an example:
+  
+  In this code, we define a type guard called `isString` that checks if a value is a string. We use this type guard in the `doSomethingWithLibraryData` function to check if the `data` parameter is a `string`. If it is, we can safely call `toUpperCase()` on it. If not, we handle the error gracefully.
+  
+  ```ts
+  function isString(value: any): value is string { //type predicate
+    return typeof value === "string";
+  }
+  
+  function doSomethingWithLibraryData(data: any) {
+    if (isString(data)) {
+      console.log(data.toUpperCase());
+    } else {
+      console.log("Data is not a string.");
+    }
+  }
+  ```
+
+`any` can be useful as an intermediate, temporary step when working with external libraries or on code migrations. However, using `any` outside of these cases should be an exception and not the rule. When possible, try to use more specific types that accurately describe the data structure and behavior, allowing TypeScript to provide better type checking, error detection, and tooling support. If you encounter a situation where you need to use `any`, consider using type guards to narrow the type back to the type it should have.
+
+In a future assignment we will look at the `unknown` type, which offers many of the benefits of `any` while providing useful restrictions.
+
+
+
+**Problems using `any`**
+
+```ts
+function processInput(input: any) {
+  console.log(input.toUpperCase());
+  console.log(input.toFixed(2));
+  console.log(input.length);
+}
+
+processInput("hello");
+processInput(42);
+processInput(true);
+```
+
+Will there be any type errors when calling the `processInput` function with different inputs like strings, numbers, and booleans?
+
+There will be no type errors at compile time when calling the `processInput` function with different inputs. This is because the input parameter has the `any` type, which disables TypeScript's type checking, allowing the function to be called with literally any value.
+
+However, this lack of type checking can lead to runtime errors. For example, calling `processInput(true)` will result in a runtime error, as the `boolean` type does not have an `toUpperCase` method.
+
+
+
+2. Rewrite `processInput` with proper typing so that the given function calls would run without any errors.
+
+```ts
+function processInput(input: any) {
+  // Your implementation here
+}
+
+processInput("hello"); // Outputs: HELLO
+processInput(42); // Outputs: 42.00
+processInput([1, 2, 3]); // Outputs: 3
+```
+
+```ts
+type Input = string | number | number[];
+
+function processInput(input: Input) {
+  if (typeof input === 'string') {
+    console.log(input.toUpperCase());
+  } else if (typeof input === 'number') {
+    console.log(input.toFixed(2));
+  } else if (Array.isArray(input)) {
+    console.log(input.length);
+  }
+}
+
+processInput("hello");
+processInput(42);
+processInput([1, 2, 3]); // Outputs: 3
+```
+
+
+
+
+
+
+
+
 
 **Type Annotations on Variables**
 
@@ -823,7 +929,108 @@ const myCanvas = document.getElementById("main_canvas") as HTMLCanvasElement;
 
 ```
 
-using `unknown` in TypeScript can help prevent TypeScript from inferring a specific type and ensure that you explicitly handle the type of the variable. Here’s how `unknown` works and how it affects type inference and type safety:
+
+
+**Unknown**
+
+- The `unknown` type was introduced in TypeScript 3.0 as a safer alternative to `any`. It is similar to the `any` type, but with stricter type checking rules. In this lesson, we will explore the `unknown` type in TypeScript, including its use cases and examples.
+
+- As you recall, the `any` type essentially overrides TypeScript's type checking; all types can be assigned to `any`, and `any` can be assigned to all other types. Further, the compiler will allow you to reference any property on an `any` value, without checking for its existence:
+
+- Using `unknown` in TypeScript can help prevent TypeScript from inferring a specific type and ensure that you explicitly handle the type of the variable. Here’s how `unknown` works and how it affects type inference and type safety:
+- Similar to `any`, all types can be assigned to the `unknown` type. However, the `unknown` type cannot be assigned to any other type, and the compiler will raise an error when you try to access any property on a value of `unknown` type. The only way to re-assign or otherwise take action on an `unknown` value is to first narrow it to a more specific type with a type guard. This behavior helps us guarantee type safety even when handling data where we don't initially know the type.
+
+*Using type assertions with unknown values*
+
+ Another common technique to narrow an `unknown` value in these scenarios is with **type assertions**. As we learned in a previous lesson, type assertions use the `as` keyword to tell the compiler that a value is a given type.
+
+This can be useful when working with external data of an `unknown` type. For example, let's say we want to handle some data from a movie API.
+
+```ts
+type MovieApiResponse = {
+  status: string;
+  data: {
+    title: string;
+    releaseYear: number;
+  };
+};
+
+function handleMovieApiResponse(response: unknown) {
+  // Perform some basic validation of the unknown type
+  if (!response || typeof response !== "object") {
+    console.log("No data received!");
+    return;
+  }
+
+  const movieApiResponse = response as MovieApiResponse; // Using a type assertion to inform TypeScript that we expect 'response' to be of type 'MovieApiResponse'
+
+  // Now TypeScript knows the structure of movieApiResponse and allows us to access its properties
+  console.log(`Status: ${movieApiResponse.status}`);
+  console.log(`Title: ${movieApiResponse.data.title}`);
+  console.log(`Release Year: ${movieApiResponse.data.releaseYear}`);
+}
+```
+
+
+
+- ```ts
+  function processValue(value: unknown) {
+    console.log(value.toLowerCase()); // 'value' is of type 'unknown'
+    console.log(value.toFixed(2)); // 'value' is of type 'unknown'
+    let strValue: string = value; // Type 'unknown' is not assignable to type 'string
+  }
+  
+  //narrow to 
+  function processValue(value: unknown) {
+    if (typeof value === "string") {
+      console.log(value.toLowerCase());
+    } else if (typeof value === "number") {
+      console.log(value.toFixed(2));
+    } else {
+      console.log("Unknown value");
+    }
+  }
+  
+  processValue("Launch School"); // prints "launch school"
+  processValue(3.14159); // prints "3.14"
+  processValue(true); // prints "Unknown value"
+  
+  //be carefull for null when narrowing an object
+  function describeShape(shape: unknown) {
+    let area: number;
+  
+    if (typeof shape === "object" && shape.kind === "circle") {
+      // 'shape' is possibly 'null'.
+      area = Math.PI * shape.radius * shape.radius;
+    } else {
+      area = shape.sideLength * shape.sideLength;
+    }
+    console.log("The area is " + area);
+  }
+  
+  //when things get crazy with objects then use a custom type (type predicate)
+  function isCircle(shape: unknown): shape is Circle {
+    return (
+      typeof shape === "object" &&
+      shape !== null &&
+      "kind" in shape &&
+      shape.kind === "circle"
+    );
+  }
+  
+  function describeShape(shape: unknown) {
+    let area: number;
+  
+    if (isCircle(shape)) {
+      area = Math.PI * shape.radius * shape.radius;
+    } else {
+      area = shape.sideLength * shape.sideLength; // 'shape' is of type 'unknown'
+    }
+    console.log("The area is " + area);
+  }
+  ```
+
+- In this case, the function can accept any value as its argument, but we won't be able to take action on that value until we narrow it to a more specific type.
 
 ```ts
 const inputElement = document.querySelector("input"); // const inputElement: Element | null
@@ -836,7 +1043,116 @@ However, we can be certain that if a DOM element is returned from this query, th
 
 To resolve the issue, we can use a type assertion to override the compiler and treat `inputElement` as an `HTMLInputElement`:
 
+
+
+**Practice Problems with Unknown**
+
+1. Given these two code snippets, which one do you think would result in a type error, or both?
+
+```ts
+const x: any = "Launch School";
+if (typeof x === "string") {
+  console.log(x.toUpperCase());
+} else {
+  console.log(x.toLowerCase());
+}
+
+
+const y: unknown = "Launch School";
+if (typeof y === "string") {
+  console.log(y.toUpperCase());
+} else {
+  console.log(y.toLowerCase());
+}
+```
+
+The second code snippet with the `unknown` type will result in an error:
+
+```plaintext
+'y' is of type 'unknown'.
+// Property 'toLowerCase' does not exist on type 'unknown'.
+```
+
+In the first code snippet, `x` is of type `any`, so TypeScript does not perform any type checking, and the code will execute without errors. However, this could lead to potential issues at runtime if `x` is not actually a string.
+
+In the second code snippet, `y` is of type `unknown`, which means TypeScript will enforce type checking. Since `y` is not guaranteed to be a string in the `else` block, TypeScript raises an error when trying to call `toLowerCase()`.
+
+
+
+2. Will the following TypeScript code compile without type errors?
+
+```ts
+let userInput: unknown;
+let userName: string;
+
+userInput = 5;
+userName = userInput;
+```
+
+There is a type error in this code.
+
 Copy Code
+
+```plaintext
+Type 'unknown' is not assignable to type 'string'.
+```
+
+The error occurs when assigning `userInput` to `userName`.
+
+In TypeScript, `unknown` is a type-safe counterpart of `any`. Anything is assignable to `unknown`, but `unknown` isn't assignable to anything (except any) without a type assertion or a control flow-based narrowing.
+
+We can't assign a variable of type `unknown` to a variable of a different type (in this case, `string`). So, trying to assign `userInput` to `userName` raises a type error.
+
+To fix this error, we must perform a type check before assigning `userInput` to `userName`, like so:
+
+```ts
+if (typeof userInput === "string") {
+  userName = userInput;
+}
+```
+
+3. Consider the following scenario: You're given a variable `data` of type `unknown`.
+
+Please write a function `processData` that takes `data` as a parameter. If `data` is a string, the function should return `"Hello, " + data`. If `data` is a number, the function should return `"Age: " + data`. If `data` is neither a string nor a number, the function should throw an error saying `"Invalid data"`.
+
+```ts
+function processData(data: unknown): string {
+  // Implement this function
+}
+
+// Usage
+console.log(processData("Alice")); // Should print: "Hello, Alice"
+console.log(processData(25)); // Should print: "Age: 25"
+console.log(processData(true)); // Should throw an error: "Invalid data"
+```
+
+```ts
+function processData(data: unknown): string {
+  if (typeof data === "string") {
+    return "Hello, " + data;
+  } else if (typeof data === "number") {
+    return "Age: " + data;
+  } else {
+    throw new Error("Invalid data");
+  }
+}
+```
+
+
+
+# Summary
+
+We covered a lot in this lesson! In order to safely make variable assignments or access properties, we often need to narrow a value's type from a wider set to a narrower set. We explored many techniques to achieve this, from simple type guards to custom guards with type predicates. We also demonstrated how discriminated unions help us distinguish between related types at runtime. Finally, we took a look at `any` and `unknown`, two "wide" types that the compiler treats very differently.
+
+Many introductory TypeScript courses introduce `any` much earlier, as a "basic" type. However, given its lack of type safety, we feel that `any` is best understood in the context of narrowing; you should rarely use the `any` type without narrowing it down.
+
+At this point, we've learned many ways to define the shape of an object. However, sometimes we don't know what an object's shape will be until runtime. Or, the properties on an object might change over the course of a program's execution. This will be the focus of the next lesson.
+
+
+
+
+
+
 
 ```ts
 // With type assertion
@@ -3808,6 +4124,8 @@ Any time `isFish` is called with some variable, TypeScript will *narrow* that va
   - `pet is Fish` is the type predicate. It means that if `isFish(pet)` returns `true`, then `pet` should be treated as a `Fish`.
 - **Type Narrowing**:
   - Inside the `if` statement where `isFish(pet)` is used, TypeScript narrows the type of `pet` to `Fish`. This allows you to safely access properties and methods specific to `Fish`.
+  - so a type predicate is when we are trying to create some conditional to narrow a type but we dont have a great way to do it. we then create a predicate function which will tell us that something is for sure that type if it returns true.. bc doing something like this: function isCircle(shape: Shape): shape is Circle {  return "radius" in shape; } if instead we just said if ("radius" in shape) wouldnt necessarily narrow it to a Circle 
+  - Type predicates can be very useful when we want to create custom logic to narrow a specific type from a union of possible types. Now that we've seen how they are used, we can understand how the TypeScript library implements `Array.isArray` using a type predicate in order to act as a type guard. To conclude, let's implement our own version of an `isArray` function and use it in our `feed` function:
 
 ```ts
 // Both calls to 'swim' and 'fly' are now okay.
@@ -3817,6 +4135,12 @@ if (isFish(pet)) {
   pet.swim();
 } else {
   pet.fly();
+}
+
+//OR
+
+function isCircle(shape: Shape): shape is Circle {
+  return "radius" in shape;
 }
 ```
 
@@ -3952,6 +4276,48 @@ function assertIsString(val: any): asserts val is string {
 }
 ```
 
+**Practice Problem Predicate**
+
+```ts
+type Vehicle = { make: string; model: string; year: number };
+type Motorcycle = Vehicle & { type: "motorcycle" };
+type Car = Vehicle & { type: "car"; doors: number };
+
+function isCar(vehicle: Vehicle | Car | Motorcycle): vehicle is Car {
+  // Implement this function
+}
+
+// Usage
+let myCar: Car = {
+  make: "Toyota",
+  model: "Camry",
+  year: 2021,
+  type: "car",
+  doors: 4,
+};
+
+if (isCar(myCar)) {
+  console.log(myCar.doors);
+}
+```
+
+Please implement the `isCar` function as a type predicate (type guard) function that determines if the input argument is of type `Car`.
+
+```ts
+function isCar(vehicle: Vehicle | Car | Motorcycle): vehicle is Car {
+  return "type" in vehicle && vehicle.type === 'car'
+}
+
+//Or 
+function isCar(vehicle: Vehicle | Car | Motorcycle): vehicle is Car {
+  return "doors" in vehicle;
+}
+```
+
+
+
+
+
 **Discrimated Unions**
 
 Most of the examples we’ve looked at so far have focused around narrowing single variables with simple types like `string`, `boolean`, and `number`. While this is common, most of the time in JavaScript we’ll be dealing with slightly more complex structures.
@@ -4001,7 +4367,7 @@ The problem with this encoding of `Shape` is that the type-checker doesn’t hav
 
 ```ts
  interface Circle {
-  kind: "circle";
+  kind: "circle"; //discriminate property
   radius: number;
 }
  
@@ -4030,9 +4396,108 @@ function getArea(shape: Shape) {
 
 In this case, `kind` was that common property (which is what’s considered a *discriminant* property of `Shape`). Checking whether the `kind` property was `"circle"` got rid of every type in `Shape` that didn’t have a `kind` property with the type `"circle"`. That narrowed `shape` down to the type `Circle`.
 
+*Discrimate Property using a switch*
+
+```ts
+function describeShape(shape: Shape) {
+  let area: number;
+
+  switch (shape.kind) {
+    case "circle":
+      area = Math.PI * shape.radius ** 2;
+      break;
+    case "square":
+      area = shape.sideLength ** 2;
+      break;
+    default:
+    // TODO: Ensure the code never reaches this condition!
+  }
+
+  console.log("The area is " + area);
+}
+```
+
+Inside the `switch` statement, we evaluate the value of the discriminant property `kind`. If the value is `"circle"`, then the TypeScript compiler can determine that the object is of type `Circle`. If the value is `"square"`, the compiler can narrow the type to `Square`.
+
+Although this is a simple example, one of the first benefits of discriminated unions is evident: the type that each conditional path handles is more clear. While we can't directly access the TypeScript type of `shape`, the `kind` property allows us to approximate this behavior.
 
 
-**Exhastiveness checking**
+
+Good for: 
+
+1. Representing different variants of a data structure: When you have multiple types in a union that share some common properties, but also have distinct properties, discriminated unions can clearly express the relationship between them. We saw this in our previous example with `Circle` and `Square` as types of `Shapes`.
+
+2. Modeling workflows or processes: When modeling processes that have a discrete set of steps or possible states, discriminated unions can be a powerful tool to express different states and their corresponding transitions. For example, you might model the various states of an HTTP Request:
+
+   ```ts
+   // Initial state before the request is made
+   type HttpRequestInitial = {
+     status: "initial";
+   };
+   
+   // Loading state when the request is in progress
+   type HttpRequestLoading = {
+     status: "loading";
+   };
+   
+   // Success state when the request has completed successfully
+   type HttpRequestSuccess = {
+     status: "success";
+     data: any; // Use a more specific type based on the expected response data
+   };
+   
+   // Error state when the request has failed
+   type HttpRequestError = {
+     status: "error";
+     error: string;
+   };
+   
+   // The HttpRequest union type represents the various states of an HTTP request
+   type HttpRequest =
+     | HttpRequestInitial
+     | HttpRequestLoading
+     | HttpRequestSuccess
+     | HttpRequestError;
+   ```
+
+   1. Error handling: Discriminated unions can be used to represent success and failure cases, making it easier to handle errors in a type-safe manner.
+
+      Copy Code
+
+      ```ts
+      type Result<T, E> =
+        | { status: "success"; value: T }
+        | { status: "failure"; error: E };
+      
+      function divide(
+        numerator: number,
+        denominator: number
+      ): Result<number, string> {
+        if (denominator === 0) {
+          return { status: "failure", error: "Division by zero" };
+        }
+        return { status: "success", value: numerator / denominator };
+      }
+      ```
+
+### When to prefer the `in` operator
+
+The expressiveness and type safety we get from discriminated unions make them a good choice in many scenarios. However, there are some cases where you may prefer to use the `in` operator for narrowing:
+
+1. When you are working with types that don't have a clear discriminant property.
+2. When you want to take action on a property that may be available on a wide set of types. For example, in a `sendMessage` function you may want to narrow down to any type that has an `email` property, regardless of the type that contains it (e.g. `Student`, `Store`, `Employee`).
+
+### Summary
+
+Although we cannot access TypeScript types at runtime, we can approximate this behavior using discriminated unions. Discriminated unions allow us to differentiate between members of a union by using a shared property called a discriminant. They are a great choice when dealing with different variants of a data structure, modeling discrete steps or states, and handling errors in a type-safe way.
+
+
+
+**Exhaustiveness checking**
+
+While this mistake might seem unlikely in this small example, this error can be easy to make in typical commercial software. In larger applications, type definitions and related functions can be spread across many files, and updated by many different software engineers.
+
+In order to prevent this sort of error, we can take advantage of a feature called **exhaustiveness checking**. Exhaustiveness checking is a feature of many typed programming languages that helps guarantee that possible cases have been handled. In TypeScript, discriminated unions help us perform exhaustiveness checking by ensuring that each possible value of the discriminant property has been covered by a `switch` statement.
 
 *Never*
 
@@ -4077,6 +4542,102 @@ Type 'Triangle' is not assignable to type 'never'.
   }
 }
 ```
+
+Exhaustiveness checks are a helpful feature of many typed languages, including TypeScript. They improve the robustness and reliability of our applications by catching potential oversights as types change over time. We can take advantage of the `never` type to add an exhaustiveness check in the `default` case of `switch` statements.
+
+
+
+**Practice Probems with Exhaustiveness Checking**
+
+Thanks to TypeScript, we have exhaustiveness checking now! This is a great programming technique to add robustness to our codebase. Let's put it in use! Suppose we're creating an application for managing a zoo. In our zoo, we have three types of animals: `Elephant`, `Tiger`, and `Peacock`.
+
+```ts
+type Elephant = {
+  kind: "elephant";
+  weight: number;
+};
+
+type Tiger = {
+  kind: "tiger";
+  speed: number;
+};
+
+type Peacock = {
+  kind: "peacock";
+  featherLength: number;
+};
+
+type Animal = Elephant | Tiger | Peacock;
+```
+
+Write a function `describeAnimal` that takes an `Animal` as an argument and returns a string describing that animal's characteristic feature. For example, if the animal is an `elephant`, the function should return `"An elephant weighs [weight] kg."`. Include an exhaustiveness check in your function to handle potential future additions to the `Animal` type.
+
+```ts
+type Elephant = {
+  kind: "elephant";
+  weight: number;
+};
+
+type Tiger = {
+  kind: "tiger";
+  speed: number;
+};
+
+type Peacock = {
+  kind: "peacock";
+  featherLength: number;
+};
+
+type Animal = Elephant | Tiger | Peacock;
+
+function describeAnimal(animal: Animal):string {
+  let sent: string;
+
+  switch (animal.kind) {
+    case "elephant": 
+      sent = `An elephant weighs ${animal.weight} kg`;
+      break;
+    case "tiger": 
+      sent = `A tiger goes ${animal.speed} mph`
+      break;
+    case "peacock":
+      sent = `A peacock's feathers are ${animal.featherLength} inch`
+      break;
+    default: 
+      const _exhaustiveCheck: never = animal;
+      throw new Error('Unhandled animal kind');
+  }
+  console.log(sent)
+  return sent
+}
+
+let elephant: Elephant = {
+  kind: 'elephant',
+  weight: 4000
+}
+
+describeAnimal(elephant)
+```
+
+1. Now suppose we want to add a new animal to our zoo: `Giraffe`. Add the `Giraffe` animal to our `Animal` type, but do not update the `describeAnimal` function. What will happen when we call `describeAnimal` with a `Giraffe`?
+
+   Solution
+
+   The TypeScript compiler will raise an error because the `Giraffe` type is not handled in the `describeAnimal` function.
+
+   ```plaintext
+   Type 'Giraffe' is not assignable to type 'never'.
+   ```
+
+   And it is not assignable to the `never` type. The unhandled `Giraffe` animal will trigger the default case of the switch statement, and the unknown animal message will be returned if the code is run.
+
+
+
+
+
+
+
+
 
 
 
@@ -4157,6 +4718,170 @@ function printVideoInfo(videoOrVideos: Video | Video[]) {
   }
 }
 ```
+
+
+
+**Narrowing with Short Circuiting**
+
+So far, we've used type guards to narrow our types inside of conditional statements like `if` and `switch`. We can also use type guards to narrow types via **short-circuiting**. Short-circuiting is a behavior of the logical operators (`&&` and `||`) in which the second operand is only evaluated if the first operand does not determine the result.
+
+```ts
+type Circle = {
+  radius: number;
+  opacity?: number;
+};
+
+type Square = {
+  sideLength: number;
+};
+
+type Shape = Circle | Square;
+
+
+function logOpacity(shape: Shape): void {
+ "opacity" in shape && console.log("this circle is opacity", shape.opacity)
+}
+const circle: Circle = { radius: 5, opacity: 0.8 };
+const square: Square = { sideLength: 4 };
+
+logOpacity(circle); // Output: "Opacity: 0.8"
+logOpacity(square); // No output
+```
+
+this will short circuit for square and not ever hit console.log
+
+**Practice Problem Narrowing with Short Circuiting**
+
+```ts
+type Vehicle =
+  | {
+      kind: "car";
+      fuelType: "gas" | "electric";
+      range: number;
+    }
+  | {
+      type: "bicycle";
+      isElectric: boolean;
+    };
+
+function getVehicleInfo(vehicle: Vehicle) {
+  const info =
+    (vehicle.kind === "car" &&
+      `Car with ${vehicle.fuelType} engine and a range of ${vehicle.range} km`) ||
+    (vehicle.type === "bicycle" &&
+      `Bicycle with electric assist: ${vehicle.isElectric}`);
+  console.log(info);
+}
+
+getVehicleInfo({ type: "bicycle", isElectric: true });
+```
+
+This code will result in a type error.
+
+```plaintext
+Property 'kind' does not exist on type 'Vehicle'.
+```
+
+TypeScript is unable to narrow down the type of vehicle within the logical expressions because the property names `kind` and `type` are different between the union types. To perform narrowing, TypeScript requires a common property with the same name and distinct values between the union types.
+
+This behavior is known as discriminated unions. We will learn more about this in the upcoming assignment.
+
+
+
+**Type Soundness**
+
+TypeScript is a statically typed language that offers great benefits such as catching errors at compile-time and enhancing code readability. However, despite TypeScript's best efforts, there are still ways to bypass its type system, resulting in a phenomenon called **type unsoundness**.
+
+Type unsoundness happens when the type system fails to prevent type errors, resulting in runtime errors. This can lead to unexpected behavior and bugs in your code. In this lesson, we'll explore some examples of type unsoundness in TypeScript.
+
+One common source of type unsoundness is when we use the `any` type. As we've learned, the `any` type can hold any value, and TypeScript will not perform any type checking on a value of `any` type. This can be useful in limited scenarios, but it will generally cause problems if misused. For example, consider the following code:
+
+```ts
+let x: any = "Launch School";
+const y: number = x;
+console.log(y);
+```
+
+Another source of type unsoundness is when we use type assertions. Type assertions allow us to tell TypeScript that a value has a certain type, even if TypeScript can't verify it. For example: * this will lead to runtime but not compiler error
+
+```ts
+let x: any = "Launch School";
+const y: number = x as number;
+```
+
+A third source of type unsoundness is when we index beyond the end of an array. For example:
+
+```ts
+const names: string[] = ["John", "Jane"];
+const name: string = names[2];
+name; // undefined
+```
+
+In this code, we try to access the third element of the `names` array, which does not exist. TypeScript allows this code to compile, even though the result is `undefined`, which is not compatible with a variable of type `string`.
+
+​		- use tuples
+
+**Practice Problems**
+
+1. Given the code examples you have seen in the assignment, which both involve using the `any` type, try to create a reusable type guard function called `isNumber` to make our code safer when working with these external code snippets.
+
+```ts
+// example 1
+let x: any = "Launch School";
+const y: number = x;
+console.log(y);
+Copy Code
+// example 2
+let x: any = "Launch School";
+const y: number = x as number;
+
+```
+
+```ts
+function isNumber(value: any): value is number {
+  return typeof value === "number";
+}
+```
+
+With this `isNumber` type guard function, we can ensure that we only assign `x` to `y` when it is a `number`:
+
+```ts
+if (isNumber(x)) {
+  const y = x;
+  console.log(y);
+} else {
+  console.log("x is not a number");
+}
+```
+
+And as you may have noticed, because of this, we don't even need to declare the type of `y` explicitly.
+
+
+
+2. ```ts
+   const names: string[] = ["John", "Jane"];
+   const name = safeGet(names, 2); // Should return undefined
+   
+   const numbers: number[] = [1, 2, 3];
+   const number = safeGet(numbers, 1); // Should return 2
+   ```
+
+   Try to create a utility function called `safeGet` that allows us to access the elements in any array safely. `safeGet` should take two arguments: an array and the index of an element in the array. If the index is within the bounds of the array, return the element at that index, otherwise, return `undefined`.
+
+   ```ts
+   function safeGet<T>(arr: T[], index: number) {
+     if (index >= 0 && index < arr.length) {
+       return arr[index];
+     }
+     return undefined;
+   }
+   ```
+
+
+
+
+
+
 
 
 
